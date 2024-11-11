@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Rooms</title>
+    <style>
+        #messageArea {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .received {
+            background-color: #e9ecef;
+        }
+        .sent {
+            background-color: #d4edda;
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Room</h1>
+    
+    <div id="connectionArea">
+        <input type="text" id="username" placeholder="Enter your username">
+        <input type="text" id="roomId" placeholder="Enter room ID">
+        <button onclick="connectToRoom()">Join Room</button>
+    </div>
+
+    <div id="chatArea" style="display: none;">
+        <h2>Room: <span id="currentRoom"></span></h2>
+        <div id="messageArea"></div>
+        <input type="text" id="messageText" placeholder="Type a message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        let ws = null;
+        let username = "";
+        let currentRoom = "";
+
+        function connectToRoom() {
+            username = document.getElementById("username").value || "Anonymous";
+            currentRoom = document.getElementById("roomId").value;
+            
+            if (!currentRoom) {
+                alert("Please enter a room ID");
+                return;
+            }
+
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(`ws://localhost:8000/ws/${currentRoom}`);
+
+            ws.onopen = function() {
+                console.log("Connected to room:", currentRoom);
+                document.getElementById("connectionArea").style.display = "none";
+                document.getElementById("chatArea").style.display = "block";
+                document.getElementById("currentRoom").textContent = currentRoom;
+                addMessage("System", "Connected to chat room", "received");
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                addMessage(data.username, data.message, 
+                          data.username === username ? "sent" : "received");
+            };
+
+            ws.onclose = function() {
+                console.log("Disconnected from room:", currentRoom);
+                document.getElementById("connectionArea").style.display = "block";
+                document.getElementById("chatArea").style.display = "none";
+                addMessage("System", "Disconnected from chat room", "received");
+            };
+        }
+
+        function sendMessage() {
+            if (!ws) return;
+
+            const messageText = document.getElementById("messageText").value;
+            if (!messageText) return;
+
+            const messageData = {
+                username: username,
+                message: messageText,
+                room_id: currentRoom
+            };
+
+            ws.send(JSON.stringify(messageData));
+            document.getElementById("messageText").value = "";
+        }
+
+        function addMessage(username, message, type) {
+            const messageArea = document.getElementById("messageArea");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = `${username}: ${message}`;
+            messageArea.appendChild(messageDiv);
+            messageArea.scrollTop = messageArea.scrollHeight;
+        }
+
+        document.getElementById("messageText").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
