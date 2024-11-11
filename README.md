@@ -1,7 +1,8 @@
 # trivia-game
-pip install -r requirements.txt
+Install all of the dependencies:
+`pip install -r requirements.txt`
 
-To start the server, run:
+and then to start the server, run:
 `
 uvicorn server:app --reload
 `
