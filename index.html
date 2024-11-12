@@ -1,115 +1,339 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat Rooms</title>
+    <title>Trivia Game</title>
     <style>
-        #messageArea {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
         }
-        .message {
-            margin: 5px 0;
-            padding: 5px;
+        #gameArea {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .option {
+            margin: 10px;
+            padding: 15px;
+            cursor: pointer;
+            border: 1px solid #ddd;
             border-radius: 5px;
+            transition: all 0.3s ease;
         }
-        .received {
+        .option:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+        }
+        .selected {
             background-color: #e9ecef;
         }
-        .sent {
+        .correct {
             background-color: #d4edda;
-            margin-left: 20px;
+            border-color: #c3e6cb;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        #scoreBoard {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .question-info {
+            margin-bottom: 15px;
+            color: #6c757d;
+        }
+        .difficulty {
+            text-transform: capitalize;
+            font-weight: bold;
+        }
+        .difficulty.easy { color: #28a745; }
+        .difficulty.medium { color: #ffc107; }
+        .difficulty.hard { color: #dc3545; }
+        input[type="text"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #playerList {
+            margin-top: 15px;
+        }
+        .player-answered {
+            color: #28a745;
+            font-style: italic;
+        }
+        .timer {
+            font-size: 1.2em;
+            color: #dc3545;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    <h1>Chat Room</h1>
-    
-    <div id="connectionArea">
-        <input type="text" id="username" placeholder="Enter your username">
-        <input type="text" id="roomId" placeholder="Enter room ID">
-        <button onclick="connectToRoom()">Join Room</button>
-    </div>
+    <div id="gameArea">
+        <div id="joinArea">
+            <h2>Join Trivia Game</h2>
+            <input type="text" id="username" placeholder="Enter your username">
+            <input type="text" id="roomId" placeholder="Enter room ID">
+            <button onclick="joinGame()">Join Game</button>
+        </div>
 
-    <div id="chatArea" style="display: none;">
-        <h2>Room: <span id="currentRoom"></span></h2>
-        <div id="messageArea"></div>
-        <input type="text" id="messageText" placeholder="Type a message">
-        <button onclick="sendMessage()">Send</button>
+        <div id="waitingArea" style="display: none;">
+            <h2>Waiting for players...</h2>
+            <button onclick="startGame()">Start Game</button>
+            <div id="playerList"></div>
+        </div>
+
+        <div id="questionArea" style="display: none;">
+            <div class="question-info">
+                Category: <span id="category"></span> | 
+                Difficulty: <span id="difficulty"></span>
+            </div>
+            <h2 id="question"></h2>
+            <div id="options"></div>
+            <div class="timer" id="timer"></div>
+        </div>
+
+        <div id="scoreBoard"></div>
     </div>
 
     <script>
-        let ws = null;
+        let ws;
         let username = "";
         let currentRoom = "";
+        let hasAnswered = false;
+        let questionTimer = null;
+        let timerSeconds = 20;
 
-        function connectToRoom() {
-            username = document.getElementById("username").value || "Anonymous";
+        function decodeHTML(html) {
+            const txt = document.createElement('textarea');
+            txt.innerHTML = html;
+            return txt.value;
+        }
+
+        function joinGame() {
+            username = document.getElementById("username").value;
             currentRoom = document.getElementById("roomId").value;
             
-            if (!currentRoom) {
-                alert("Please enter a room ID");
+            if (!username || !currentRoom) {
+                alert("Please enter both username and room ID");
                 return;
             }
 
+            // Close existing connection if any
             if (ws) {
                 ws.close();
             }
 
             ws = new WebSocket(`ws://localhost:8000/ws/${currentRoom}`);
-
+            
             ws.onopen = function() {
-                console.log("Connected to room:", currentRoom);
-                document.getElementById("connectionArea").style.display = "none";
-                document.getElementById("chatArea").style.display = "block";
-                document.getElementById("currentRoom").textContent = currentRoom;
-                addMessage("System", "Connected to chat room", "received");
+                console.log("Connected to game server");
+                const joinMessage = {
+                    type: "join",
+                    username: username
+                };
+                ws.send(JSON.stringify(joinMessage));
+                document.getElementById("joinArea").style.display = "none";
+                document.getElementById("waitingArea").style.display = "block";
             };
 
-            ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                addMessage(data.username, data.message, 
-                          data.username === username ? "sent" : "received");
-            };
+            ws.onmessage = handleMessage;
 
             ws.onclose = function() {
-                console.log("Disconnected from room:", currentRoom);
-                document.getElementById("connectionArea").style.display = "block";
-                document.getElementById("chatArea").style.display = "none";
-                addMessage("System", "Disconnected from chat room", "received");
+                console.log("Disconnected from game server");
+                alert("Connection lost. Please refresh to rejoin.");
+            };
+
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+                alert("Connection error. Please try again.");
             };
         }
 
-        function sendMessage() {
-            if (!ws) return;
+        function startGame() {
+            ws.send(JSON.stringify({ type: "start_game" }));
+        }
 
-            const messageText = document.getElementById("messageText").value;
-            if (!messageText) return;
+        function startTimer() {
+            clearInterval(questionTimer);
+            let timeLeft = timerSeconds;
+            
+            const timerElement = document.getElementById("timer");
+            timerElement.textContent = `Time remaining: ${timeLeft}s`;
 
-            const messageData = {
+            questionTimer = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = `Time remaining: ${timeLeft}s`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(questionTimer);
+                    if (!hasAnswered) {
+                        // Auto-submit timeout answer
+                        submitAnswer(-1); // Invalid answer index
+                    }
+                }
+            }, 1000);
+        }
+
+        function submitAnswer(answerIndex) {
+            if (hasAnswered) return;
+            
+            hasAnswered = true;
+            clearInterval(questionTimer);
+            
+            ws.send(JSON.stringify({
+                type: "answer",
                 username: username,
-                message: messageText,
-                room_id: currentRoom
-            };
+                answer: answerIndex
+            }));
 
-            ws.send(JSON.stringify(messageData));
-            document.getElementById("messageText").value = "";
+            const options = document.querySelectorAll('.option');
+            options.forEach(opt => {
+                opt.style.pointerEvents = 'none';
+            });
+            if (answerIndex >= 0) {
+                options[answerIndex].classList.add('selected');
+            }
         }
 
-        function addMessage(username, message, type) {
-            const messageArea = document.getElementById("messageArea");
-            const messageDiv = document.createElement("div");
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = `${username}: ${message}`;
-            messageArea.appendChild(messageDiv);
-            messageArea.scrollTop = messageArea.scrollHeight;
+        function handleMessage(event) {
+            const data = JSON.parse(event.data);
+            
+            switch(data.type) {
+                case "player_joined":
+                    updateScoreboard(data.scores);
+                    updatePlayerList(Object.keys(data.scores));
+                    break;
+
+                case "question":
+                    showQuestion(data.question);
+                    hasAnswered = false;
+                    startTimer();
+                    break;
+
+                case "answer_received":
+                    markPlayerAnswered(data.username);
+                    break;
+
+                case "reveal":
+                    showAnswer(data.correct_answer);
+                    updateScoreboard(data.scores);
+                    break;
+
+                case "game_over":
+                    showGameOver(data.final_scores);
+                    break;
+
+                case "error":
+                    alert(data.message);
+                    break;
+            }
         }
 
-        document.getElementById("messageText").addEventListener("keypress", function(e) {
+        function showQuestion(questionData) {
+            document.getElementById("waitingArea").style.display = "none";
+            document.getElementById("questionArea").style.display = "block";
+            
+            document.getElementById("category").textContent = questionData.category;
+            document.getElementById("difficulty").textContent = questionData.difficulty;
+            document.getElementById("difficulty").className = `difficulty ${questionData.difficulty}`;
+            
+            document.getElementById("question").innerHTML = decodeHTML(questionData.question);
+            
+            const optionsDiv = document.getElementById("options");
+            optionsDiv.innerHTML = "";
+            questionData.options.forEach((option, index) => {
+                const button = document.createElement("div");
+                button.className = "option";
+                button.innerHTML = decodeHTML(option);
+                button.onclick = () => submitAnswer(index);
+                optionsDiv.appendChild(button);
+            });
+        }
+
+        function showAnswer(correctAnswer) {
+            const options = document.querySelectorAll('.option');
+            options[correctAnswer].classList.add('correct');
+            options.forEach((option, index) => {
+                if (index !== correctAnswer) {
+                    option.classList.add('incorrect');
+                }
+            });
+        }
+
+        function updateScoreboard(scores) {
+            const scoreBoard = document.getElementById("scoreBoard");
+            scoreBoard.innerHTML = "<h3>Scores:</h3>";
+            Object.entries(scores)
+                .sort(([,a],[,b]) => b-a)
+                .forEach(([player, score]) => {
+                    scoreBoard.innerHTML += `<div>${player}: ${score}</div>`;
+                });
+        }
+
+        function updatePlayerList(players) {
+            const playerList = document.getElementById("playerList");
+            playerList.innerHTML = "<h3>Players:</h3>";
+            players.forEach(player => {
+                playerList.innerHTML += `<div class="player" data-username="${player}">${player}</div>`;
+            });
+        }
+
+        function markPlayerAnswered(playerUsername) {
+            const playerDiv = document.querySelector(`.player[data-username="${playerUsername}"]`);
+            if (playerDiv) {
+                playerDiv.classList.add('player-answered');
+                playerDiv.textContent += ' (answered)';
+            }
+        }
+
+        function showGameOver(finalScores) {
+            clearInterval(questionTimer);
+            document.getElementById("questionArea").style.display = "none";
+            document.getElementById("gameArea").innerHTML += `
+                <div class="game-over">
+                    <h2>Game Over!</h2>
+                    <h3>Final Scores:</h3>
+                    ${Object.entries(finalScores)
+                        .sort(([,a],[,b]) => b-a)
+                        .map(([player, score]) => `<div>${player}: ${score}</div>`)
+                        .join('')}
+                    <button onclick="location.reload()">Play Again</button>
+                </div>
+            `;
+        }
+
+        document.getElementById("username").addEventListener("keypress", function(e) {
             if (e.key === "Enter") {
-                sendMessage();
+                document.getElementById("roomId").focus();
+            }
+        });
+
+        document.getElementById("roomId").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                joinGame();
             }
         });
     </script>
