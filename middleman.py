@@ -1,13 +1,15 @@
 import socket
 import logging
+from room import Room
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
 class MiddlemanServer:
+    application_servers_enum = []
     application_servers = {}  # Format: {'service_name': ('ip', port)}
-    rooms = {}  # Format: {'join_code': RoomProcess}
+    rooms = {}  # Format: {'join_code': Room}
 
     def __init__(self, host='127.0.0.1', port=5000, max_threads=10):
         self.host = host
@@ -20,8 +22,10 @@ class MiddlemanServer:
         # self.executor = ThreadPoolExecutor(max_workers=max_threads)
         logging.info(f"Middleman server started on {self.host}:{self.port}")
         print(f'Listening on port {self.location}')
+        self.join_code = 0
+        self.rooms = {}
 
-    def handle_http_request(self,request_bytes):
+    def handle_http_request(self,request_bytes, sock):
         request_str = request_bytes.decode()
         request_lines = request_str.split('\r\n')
         request_line = request_lines[0].split(' ')
@@ -43,7 +47,7 @@ class MiddlemanServer:
             </form>
             </body>
             </html> '''
-            application_servers_list = ''.join(f'<li>{server}</li>' for server in self.application_servers)
+            application_servers_list = ''.join(f'<li>{server}</li>' for server in self.application_servers_enum)
             html_content = html_content.format(application_servers=application_servers_list)
             return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + html_content.encode()
         elif method == 'POST' and path == '/':
@@ -52,9 +56,11 @@ class MiddlemanServer:
             data = {k: v for k, v in (param.split('=') for param in params)}
             server_number = data.get('server_number')
             if server_number:
+                self.create_room(sock, server_number)
                 response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
                 return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
-            else: return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
+            else: 
+                return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
         else:
             return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
     
@@ -68,13 +74,41 @@ class MiddlemanServer:
                 print()
             except Exception as ex:
                 print(ex)
-            resp = self.handle_http_request(data)
+            resp = self.handle_http_request(data, sock)
             sock.sendall(resp)
     
     def register_application_server(self, service_name, address):
         self.application_servers[service_name] = address
+        self.application_servers_enum.append(service_name)
         logging.info(f"Registered application server {service_name} at {address}")
 
+    def create_room(self, client_socket, server_number):
+        try:
+            server_number = int(server_number)
+        except ValueError as ex:
+            print('invalid server number, room could not be created')
+            return
+        if not self.is_natural_number(server_number):
+            print('invalid server number, room could not be created')
+            return
+
+        app_server_location = self.application_servers.get(self.application_servers_enum[server_number])
+        if app_server_location:
+            # Start new room process
+            room = Room(self.join_code, client_socket, app_server_location)
+            self.rooms[self.join_code] = room
+            room.start()
+            logging.info(f"Room {self.join_code} created for service {self.application_servers_enum[server_number]}.")
+            self.join_code+=1
+        else:
+            pass
+
+    def is_natural_number(self,num):
+        if type(num)!=int:
+            return False
+        if num < 0:
+            return False
+        return True
 
 if __name__ == '__main__':
     middleman_server = MiddlemanServer()
