@@ -1,87 +1,85 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import socket
-import threading
-import json
-import random
-import string
 import logging
 
-# Updated RoomProcess to handle HTTP requests for multiple endpoints
-class RoomProcess(HTTPServer):
-    def __init__(self, join_code, host, port, app_servers):
-        # Each room process has its join code, binds to a unique port, and connects to specific app servers
-        super().__init__((host, port), RoomRequestHandler)
-        self.join_code = join_code
-        self.app_servers = app_servers  # {'trivia': ('ip', port), 'battleship': ('ip', port)}
-        self.active_connections = {}
 
-    def run(self):
-        logging.info(f"Starting room {self.join_code} server on port {self.server_address[1]}")
-        self.serve_forever()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
-    def connect_to_app_server(self, endpoint):
-        # Establish a connection to the appropriate application server based on the endpoint
-        app_server_addr = self.app_servers.get(endpoint)
-        if app_server_addr and endpoint not in self.active_connections:
-            sock = socket.create_connection(app_server_addr)
-            self.active_connections[endpoint] = sock
-            logging.info(f"Connected to {endpoint} app server for room {self.join_code}")
-        return self.active_connections.get(endpoint)
 
-class RoomRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        endpoint = self.path.lstrip('/')  # Determine the endpoint from the URL path
-        app_server_sock = self.server.connect_to_app_server(endpoint)
-        
-        if not app_server_sock:
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"Application endpoint not found.")
-            return
-
-        # Send a request to the app server and get the response
-        try:
-            # Example request message to app server
-            app_server_sock.sendall(b"GET request to endpoint")
-            response = app_server_sock.recv(4096)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            self.wfile.write(response)
-        except Exception as e:
-            logging.error(f"Error communicating with app server for {endpoint}: {e}")
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(b"Internal server error.")
-
-    def log_message(self, format, *args):
-        return  # Suppress default logging
-
-# Main Middleman Server with HTTP endpoint handling
 class MiddlemanServer:
-    def __init__(self, host='0.0.0.0', port=5000):
+    application_servers = {}  # Format: {'service_name': ('ip', port)}
+    rooms = {}  # Format: {'join_code': RoomProcess}
+
+    def __init__(self, host='127.0.0.1', port=5000, max_threads=10):
         self.host = host
         self.port = port
-        self.application_servers = {
-            'trivia': ('127.0.0.1', 6000),
-            'battleship': ('127.0.0.1', 6001)
-        }
-        self.rooms = {}
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        # self.server_socket.bind((socket.gethostname(), port))
+        # self.server_socket.listen()
+        self.location = self.server_socket.getsockname()
+        # self.executor = ThreadPoolExecutor(max_workers=max_threads)
+        logging.info(f"Middleman server started on {self.host}:{self.port}")
+        print(f'Listening on port {self.location}')
 
-    def create_room(self, client_socket, request):
-        join_code = self.generate_join_code()
-        room_port = random.randint(10000, 20000)  # Assign a unique port for the room process
-        room = RoomProcess(join_code, self.host, room_port, self.application_servers)
-        self.rooms[join_code] = room
-        threading.Thread(target=room.run).start()  # Run room server in a separate thread
-        client_socket.send(json.dumps({'status': 'success', 'join_code': join_code, 'port': room_port}).encode())
-        logging.info(f"Room {join_code} created on port {room_port}.")
+    def handle_http_request(self,request_bytes):
+        request_str = request_bytes.decode()
+        request_lines = request_str.split('\r\n')
+        request_line = request_lines[0].split(' ')
+        method = request_line[0]
+        path = request_line[1]
+        # Log the request details
+        print(f"Method: {method}, Path: {path}")
 
-    def generate_join_code(self, length=6):
-        return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+        if method == 'GET' and path == '/':
+            html_content = '''
+            <html>
+            <head><title>Event Rooms</title></head>
+            <body style="text-align: center;">
+            <h1>Event Rooms!</h1>
+            <ol> {application_servers} </ol>
+            <form method="POST" action="/">
+                <label for="server_number">Enter Server Number:</label>
+                <input type="text" id="server_number" name="server_number" required> <input type="submit" value="Submit">
+            </form>
+            </body>
+            </html> '''
+            application_servers_list = ''.join(f'<li>{server}</li>' for server in self.application_servers)
+            html_content = html_content.format(application_servers=application_servers_list)
+            return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + html_content.encode()
+        elif method == 'POST' and path == '/':
+            body = request_str.split('\r\n\r\n')[1]
+            params = body.split('&')
+            data = {k: v for k, v in (param.split('=') for param in params)}
+            server_number = data.get('server_number')
+            if server_number:
+                response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
+                return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
+            else: return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
+        else:
+            return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
+    
+    def accept_connections(self):
+        while True:
+            self.server_socket.listen(2) # play with this val
+            sock, client_address = self.server_socket.accept()
+            try:
+                data = sock.recv(1024)
+                print(data)
+                print()
+            except Exception as ex:
+                print(ex)
+            resp = self.handle_http_request(data)
+            sock.sendall(resp)
+    
+    def register_application_server(self, service_name, address):
+        self.application_servers[service_name] = address
+        logging.info(f"Registered application server {service_name} at {address}")
 
-# Server Entry Point
+
 if __name__ == '__main__':
     middleman_server = MiddlemanServer()
-    logging.info("Middleman server started.")
-    # Run middleman_server's client connection handling here
+    # Register available application servers
+    middleman_server.register_application_server('trivia', ('127.0.0.1', 6000))
+    middleman_server.register_application_server('battleship', ('127.0.0.1', 6001))
+    # Start accepting connections from clients
+    middleman_server.accept_connections()
