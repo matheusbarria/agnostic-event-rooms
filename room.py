@@ -2,7 +2,7 @@ import select
 import socket
 import logging
 import multiprocessing
-import struct
+import json
 
 class Room(multiprocessing.Process):
     def __init__(self, join_code, client_socket, app_server_addr):
@@ -14,10 +14,8 @@ class Room(multiprocessing.Process):
 
     def connect_to_game_server(self):
         self.app_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print('1a')
         try:
             self.app_socket.connect(self.app_server_addr)
-            print('1b')
             return True
         except Exception as e:
             logging.error(f"Failed to connect to game server: {e}")
@@ -36,33 +34,30 @@ class Room(multiprocessing.Process):
             logging.error(f"Error receiving message: {e}")
             return None
 
-    def send_message(self, sock, data):
+    def send_to_app(self, sock, data):
         try:
-            length = len(data)
-            sock.sendall(struct.pack('!I', length))
-            sock.sendall(data)
+            if type(data)==dict:
+                data = json.dumps(data)
+            data = data.encode()
+            resp = len(data).to_bytes(4,'big') + data
+            sock.sendall(resp)
         except Exception as e:
             logging.error(f"Error sending message: {e}")
 
     def run(self):
         logging.info(f"Room {self.join_code} connecting to game server.")
-        print('1')
         if not self.connect_to_game_server():
             self.send_to_all_clients(b"HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to connect to game server")
             return
-        print('1c')
         initial_response = self.receive_message(self.app_socket)
-        print(f'Start: {initial_response}')
         if initial_response:
             self.send_to_all_clients(initial_response)
 
         while True:
-            print('reading sockets')
             readable, _, _ = select.select(list(self.client_sockets.values()) + [self.app_socket], [], [], 0.1)
             
             for sock in readable:
                 if sock == self.app_socket:
-                    print('message from app')
                     # Message from game server
                     data = self.receive_message(sock)
                     if data:
@@ -71,11 +66,11 @@ class Room(multiprocessing.Process):
                         logging.info("Game server disconnected")
                         return
                 else:
-                    print('messasge from client')
                     # Message from client
                     data = sock.recv(1024)
                     if data:
-                        self.send_message(self.app_socket, data)
+                        print(f'data from client: {data}')
+                        self.send_to_app(self.app_socket, {'username':'username', 'message':data.get('message')})
                     else:
                         # Client disconnected
                         self.client_sockets.pop(sock.fileno(), None)
