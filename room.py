@@ -14,8 +14,10 @@ class Room(multiprocessing.Process):
 
     def connect_to_game_server(self):
         self.app_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print('1a')
         try:
             self.app_socket.connect(self.app_server_addr)
+            print('1b')
             return True
         except Exception as e:
             logging.error(f"Failed to connect to game server: {e}")
@@ -23,10 +25,11 @@ class Room(multiprocessing.Process):
 
     def receive_message(self, sock):
         try:
-            length_bytes = sock.recv(4)
-            if not length_bytes:
+            bytes = sock.recv(4)
+            length = int.from_bytes(bytes, byteorder='big')
+            print(f'recieved message from app of length: {length}')
+            if not length:
                 return None
-            length = struct.unpack('!I', length_bytes)[0]
             data = sock.recv(length)
             return data
         except Exception as e:
@@ -43,20 +46,23 @@ class Room(multiprocessing.Process):
 
     def run(self):
         logging.info(f"Room {self.join_code} connecting to game server.")
-        
+        print('1')
         if not self.connect_to_game_server():
             self.send_to_all_clients(b"HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to connect to game server")
             return
-
+        print('1c')
         initial_response = self.receive_message(self.app_socket)
+        print(f'Start: {initial_response}')
         if initial_response:
             self.send_to_all_clients(initial_response)
 
         while True:
+            print('reading sockets')
             readable, _, _ = select.select(list(self.client_sockets.values()) + [self.app_socket], [], [], 0.1)
             
             for sock in readable:
                 if sock == self.app_socket:
+                    print('message from app')
                     # Message from game server
                     data = self.receive_message(sock)
                     if data:
@@ -65,6 +71,7 @@ class Room(multiprocessing.Process):
                         logging.info("Game server disconnected")
                         return
                 else:
+                    print('messasge from client')
                     # Message from client
                     data = sock.recv(1024)
                     if data:
