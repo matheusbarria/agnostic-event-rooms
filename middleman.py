@@ -34,7 +34,15 @@ class MiddlemanServer:
         # Log the request details
         print(f"Method: {method}, Path: {path}")
 
-        if method == 'GET' and path == '/':
+        if method == 'GET':
+            return self._handle_get(path)
+        elif method == 'POST':
+            return self._handle_post(path,request_str, sock)
+        else:
+            return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
+    
+    def _handle_get(self, path):
+        if path == '/': # client requesting the index page
             html_content = '''
             <html>
             <head><title>Event Rooms</title></head>
@@ -50,8 +58,12 @@ class MiddlemanServer:
             application_servers_list = ''.join(f'<li>{server}</li>' for server in self.application_servers_enum)
             html_content = html_content.format(application_servers=application_servers_list)
             return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + html_content.encode()
-        elif method == 'POST' and path == '/':
-            body = request_str.split('\r\n\r\n')[1]
+        else:
+            return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
+        
+    def _handle_post(self,path, request, sock):
+        if path == '/': # client should be requesting an new application server room
+            body = request.split('\r\n\r\n')[1]
             params = body.split('&')
             data = {k: v for k, v in (param.split('=') for param in params)}
             server_number = data.get('server_number')
@@ -61,9 +73,7 @@ class MiddlemanServer:
                 return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
             else: 
                 return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
-        else:
-            return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
-    
+
     def accept_connections(self):
         while True:
             self.server_socket.listen(2) # play with this val
