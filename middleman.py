@@ -1,6 +1,8 @@
 import socket
 import logging
 from room import Room
+import json
+import threading, time
 
 
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -24,6 +26,7 @@ class MiddlemanServer:
         print(f'Listening on port {self.location}')
         self.join_code = 0
         self.rooms = {}
+
 
     def handle_http_request(self,request_bytes, sock):
         request_str = request_bytes.decode()
@@ -86,14 +89,16 @@ class MiddlemanServer:
                 return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
 
     def accept_connections(self):
+        # create thread to accept registration requests
+        name_thread = threading.Thread(target=self.register_application_server)
+        name_thread.daemon = True
+        name_thread.start()
         while True:
             try:
                 self.server_socket.listen(2) # play with this val
                 sock, client_address = self.server_socket.accept()
                 try:
                     data = sock.recv(1024)
-                    print(data)
-                    print()
                 except Exception as ex:
                     print(ex)
                 resp = self.handle_http_request(data, sock)
@@ -102,10 +107,18 @@ class MiddlemanServer:
                 print(ex)
                 continue
     
-    def register_application_server(self, service_name, address):
-        self.application_servers[service_name] = address
-        self.application_servers_enum.append(service_name)
-        logging.info(f"Registered application server {service_name} at {address}")
+    def register_application_server(self):
+        # UDP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('127.0.0.1', 5001))
+        while 1:
+            data = sock.recv(1024)
+            if data:
+                data = json.loads(data)
+                print(f'registration attempt: {data}')
+                self.application_servers[data['service_name']] = (data['host'],data['port'])
+                self.application_servers_enum.append(data['service_name'])
+        # logging.info(f"Registered application server {service_name} at {address}")
 
     def create_room(self, client_socket, server_number):
         app_server_location = self.application_servers.get(self.application_servers_enum[server_number])
@@ -131,9 +144,9 @@ if __name__ == '__main__':
 
     middleman_server = MiddlemanServer()
 
-    # Register available application servers
-    middleman_server.register_application_server('trivia', ('127.0.0.1', 6000))
-    middleman_server.register_application_server('battleship', ('127.0.0.1', 6001))
-    
+    # # Register available application servers
+    # middleman_server.register_application_server('trivia', ('127.0.0.1', 6000))
+    # middleman_server.register_application_server('battleship', ('127.0.0.1', 6001))
+
     # Start accepting connections from clients
     middleman_server.accept_connections()
