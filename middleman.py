@@ -3,7 +3,7 @@ import logging
 from room import Room
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
 class MiddlemanServer:
@@ -48,9 +48,12 @@ class MiddlemanServer:
             <head><title>Event Rooms</title></head>
             <body style="text-align: center;">
             <h1>Event Rooms!</h1>
-            <ol> {application_servers} </ol>
+            <br/>
+            <h3>Select an Application to Create a Room:</h3>
+            <ol style="list-style-position: inside; text-align: center;"> {application_servers} </ol>
+            <br/>
             <form method="POST" action="/">
-                <label for="server_number">Enter Server Number:</label>
+                <label for="server_number">Enter Application Number:\n</label>
                 <input type="text" id="server_number" name="server_number" required> <input type="submit" value="Submit">
             </form>
             </body>
@@ -68,6 +71,14 @@ class MiddlemanServer:
             data = {k: v for k, v in (param.split('=') for param in params)}
             server_number = data.get('server_number')
             if server_number:
+                try:
+                    server_number = int(server_number) -  1
+                except ValueError as ex:
+                    print('invalid server number, room could not be created')
+                    return b"HTTP/1.1 415 Unsupported Media\r\nContent-Type: text/html\r\n\r\n<html><body><h1>415 Unsupported Media</h1>Please enter an Integer</body></html>"
+                if not self.is_natural_number(server_number) or server_number>=len(self.application_servers):
+                    print('invalid server number, room could not be created')
+                    return b"HTTP/1.1 415 Unsupported Media\r\nContent-Type: text/html\r\n\r\n<html><body><h1>415 Unsupported Media</h1>Please enter a valid application number</body></html>"
                 self.create_room(sock, server_number)
                 response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
                 return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
@@ -76,16 +87,20 @@ class MiddlemanServer:
 
     def accept_connections(self):
         while True:
-            self.server_socket.listen(2) # play with this val
-            sock, client_address = self.server_socket.accept()
             try:
-                data = sock.recv(1024)
-                print(data)
-                print()
+                self.server_socket.listen(2) # play with this val
+                sock, client_address = self.server_socket.accept()
+                try:
+                    data = sock.recv(1024)
+                    print(data)
+                    print()
+                except Exception as ex:
+                    print(ex)
+                resp = self.handle_http_request(data, sock)
+                sock.sendall(resp)
             except Exception as ex:
                 print(ex)
-            resp = self.handle_http_request(data, sock)
-            sock.sendall(resp)
+                continue
     
     def register_application_server(self, service_name, address):
         self.application_servers[service_name] = address
@@ -93,15 +108,6 @@ class MiddlemanServer:
         logging.info(f"Registered application server {service_name} at {address}")
 
     def create_room(self, client_socket, server_number):
-        try:
-            server_number = int(server_number)
-        except ValueError as ex:
-            print('invalid server number, room could not be created')
-            return
-        if not self.is_natural_number(server_number):
-            print('invalid server number, room could not be created')
-            return
-
         app_server_location = self.application_servers.get(self.application_servers_enum[server_number])
         if app_server_location:
             # Start new room process
@@ -111,6 +117,7 @@ class MiddlemanServer:
             logging.info(f"Room {self.join_code} created for service {self.application_servers_enum[server_number]}.")
             self.join_code+=1
         else:
+            print('no app server location found; room could not be created')
             pass
 
     def is_natural_number(self,num):
