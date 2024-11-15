@@ -128,9 +128,12 @@ class MiddlemanServer:
         return True
 
 if __name__ == '__main__':
+
     middleman_server = MiddlemanServer()
+
     # Register available application servers
     middleman_server.register_application_server('trivia', ('127.0.0.1', 6000))
     middleman_server.register_application_server('battleship', ('127.0.0.1', 6001))
+    
     # Start accepting connections from clients
     middleman_server.accept_connections()

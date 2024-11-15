@@ -16,9 +16,9 @@ class Room(multiprocessing.Process):
     
     def run(self):
         logging.info(f"Room {self.join_code} should now try to connect to gameserver.")
-        self.send_to_clients(f"<html><body>Room {self.join_code}</body></html>".encode())
+        self.send_to_all_clients(f"<html><body>Room {self.join_code}</body></html>".encode())
         return
 
-    def send_to_clients(self, message):
+    def send_to_all_clients(self, message):
         for client_num, sock in self.client_sockets.items():
             sock.sendall(message)
