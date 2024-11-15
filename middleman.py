@@ -116,8 +116,9 @@ class MiddlemanServer:
             if data:
                 data = json.loads(data)
                 print(f'registration attempt: {data}')
-                self.application_servers[data['service_name']] = (data['host'],data['port'])
-                self.application_servers_enum.append(data['service_name'])
+                if data['service_name'] not in self.application_servers:
+                    self.application_servers[data['service_name']] = (data['host'],data['port'])
+                    self.application_servers_enum.append(data['service_name'])
         # logging.info(f"Registered application server {service_name} at {address}")
 
     def create_room(self, client_socket, server_number):
