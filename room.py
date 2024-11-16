@@ -5,6 +5,8 @@ import multiprocessing
 import json
 
 class Room(multiprocessing.Process):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+
     def __init__(self, join_code, client_socket, app_server_addr):
         super().__init__()
         self.join_code = join_code
@@ -25,10 +27,10 @@ class Room(multiprocessing.Process):
         try:
             bytes = sock.recv(4)
             length = int.from_bytes(bytes, byteorder='big')
-            print(f'recieved message from app of length: {length}')
             if not length:
                 return None
             data = sock.recv(length)
+            print(f'recieved message from app: {data}')
             return data
         except Exception as e:
             logging.error(f"Error receiving message: {e}")

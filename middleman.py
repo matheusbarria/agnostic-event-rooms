@@ -29,6 +29,8 @@ class MiddlemanServer:
 
 
     def handle_http_request(self,request_bytes, sock):
+        if not request_bytes:
+            return b"No Content"
         request_str = request_bytes.decode()
         request_lines = request_str.split('\r\n')
         request_line = request_lines[0].split(' ')
@@ -83,10 +85,10 @@ class MiddlemanServer:
                     print('invalid server number, room could not be created')
                     return b"HTTP/1.1 415 Unsupported Media\r\nContent-Type: text/html\r\n\r\n<html><body><h1>415 Unsupported Media</h1>Please enter a valid application number</body></html>"
                 self.create_room(sock, server_number)
-                response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
-                return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
-            else: 
-                return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
+            #     response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
+            #     return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
+            # else: 
+            #     return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
 
     def accept_connections(self):
         # create thread to accept registration requests
@@ -102,7 +104,8 @@ class MiddlemanServer:
                 except Exception as ex:
                     print(ex)
                 resp = self.handle_http_request(data, sock)
-                sock.sendall(resp)
+                if resp:
+                    sock.sendall(resp)
             except Exception as ex:
                 print(ex)
                 continue
