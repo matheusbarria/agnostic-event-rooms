@@ -19,8 +19,7 @@ def receive(sock):
     raw_msglen = _receive_all(sock, 4)
     if not raw_msglen:
         return None
-    print(raw_msglen)
-    # msglen = struct.unpack('>I', raw_msglen)[0]
+    raw_msglen = int.from_bytes(raw_msglen,'big')
     return _receive_all(sock,raw_msglen)
 
 def _receive_all(sock, n):
@@ -34,9 +33,10 @@ def _receive_all(sock, n):
 
 html_page = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chat Room</title><style>body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } .chat-container { width: 50%; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; } .chat-header { padding: 10px; background: #007bff; color: white; text-align: center; font-size: 1.2em; } .chat-messages { padding: 20px; height: 300px; overflow-y: scroll; border-bottom: 1px solid #ddd; } .chat-message { padding: 10px; border-radius: 4px; margin-bottom: 10px; } .message-sender { font-weight: bold; margin-bottom: 5px; } .message-text { margin: 0; } .chat-input { display: flex; padding: 10px; } .chat-input input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; outline: none; } .chat-input button { padding: 10px 20px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 0 4px 4px 0; cursor: pointer; } .chat-input button:hover { background: #0056b3; } </style></head><body><div class="chat-container"><div class="chat-header">Chat Room</div><div class="chat-messages">{messages}</div><div class="chat-input"><input type="text" placeholder="Type your message..."><button>Send</button></div></div></body></html>'
 def format_response(html,message_list):
-    messages = ''.join(f'<div class="chat-message"><div class="message-sender">{user}:</div><div class="message-text">{text}</div></div>' for user,text in message_list)
+    print("message list: ",message_list)
+    messages = ''.join(f'<div class=chat-message><div class=message-sender>{user}:</div><div class=message-text>{text}</div></div>' for user,text in message_list)
     # page = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chat Room</title><style>body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } .chat-container { width: 50%; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; } .chat-header { padding: 10px; background: #007bff; color: white; text-align: center; font-size: 1.2em; } .chat-messages { padding: 20px; height: 300px; overflow-y: scroll; border-bottom: 1px solid #ddd; } .chat-message { padding: 10px; border-radius: 4px; margin-bottom: 10px; } .message-sender { font-weight: bold; margin-bottom: 5px; } .message-text { margin: 0; } .chat-input { display: flex; padding: 10px; } .chat-input input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; outline: none; } .chat-input button { padding: 10px 20px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 0 4px 4px 0; cursor: pointer; } .chat-input button:hover { background: #0056b3; } </style></head><body><div class="chat-container"><div class="chat-header">Chat Room</div><div class="chat-messages">' + messages + '</div><div class="chat-input"><input type="text" placeholder="Type your message..."><button>Send</button></div></div></body></html>'
-    page = '<!DOCTYPE html><html lang=en><head><meta charset=UTF-8><meta name=viewport content=width=device-width, initial-scale=1.0><title>Chat Room</title><style>body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } .chat-container { width: 50%; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; } .chat-header { padding: 10px; background: #007bff; color: white; text-align: center; font-size: 1.2em; } .chat-messages { padding: 20px; height: 300px; overflow-y: scroll; border-bottom: 1px solid #ddd; } .chat-message { padding: 10px; border-radius: 4px; margin-bottom: 10px; } .message-sender { font-weight: bold; margin-bottom: 5px; } .message-text { margin: 0; } .chat-input { display: flex; padding: 10px; } .chat-input input[type=text] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; outline: none; } .chat-input button { padding: 10px 20px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 0 4px 4px 0; cursor: pointer; } .chat-input button:hover { background: #0056b3; } </style></head><body><div class=chat-container><div class=chat-header>Chat Room</div><div class=chat-messages>' + messages + '</div><div class=chat-input><form method=POST action=/><input type=text name=message placeholder=Type your message...><button type=submit>Send</button></form></div></div></body></html>'
+    page = '<!DOCTYPE html><html lang=en><head><meta charset=UTF-8><meta name=viewport content=width=device-width, initial-scale=1.0><title>Chat Room</title><style>body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; } .chat-container { width: 50%; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; } .chat-header { padding: 10px; background: #007bff; color: white; text-align: center; font-size: 1.2em; } .chat-messages { padding: 20px; height: 300px; overflow-y: scroll; border-bottom: 1px solid #ddd; } .chat-message { padding: 10px; border-radius: 4px; margin-bottom: 10px; } .message-sender { font-weight: bold; margin-bottom: 5px; } .message-text { margin: 0; } .chat-input { display: flex; padding: 10px; } .chat-input input[type=text] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; outline: none; } .chat-input button { padding: 10px 20px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 0 4px 4px 0; cursor: pointer; } .chat-input button:hover { background: #0056b3; } </style></head><body><div>Room Join Code: JOIN_CODE</div><br/><div class=chat-container><div class=chat-header>Chat Room</div><div class=chat-messages>' + messages + '</div><div class=chat-input><form method=POST action=/JOIN_CODE><input type=text name=message placeholder=Type your message...><button type=submit>Send</button></form></div></div></body></html>'
     # page = '<body style=text-align: center;><form method=POST action=/><label for=message>Enter Message:</label><input type=text id=message name=message required> <input type=submit value=Submit></form></body>'
     # page = html.format(messages=messages)
     return page
@@ -62,25 +62,31 @@ while True:
         for sock in readable:
             if sock == server_socket:
                 connection, client_address = sock.accept()
-                sockets_list[connection] = []
-                initial_response = json.dumps(format_response(html=html_page, message_list=[]))
-                initial_response = len(initial_response).to_bytes(4,'big') + initial_response.encode()
-                connection.sendall(initial_response)
-                color_print(f'New connection from {sockets_list[connection]} (socket {connection.fileno()})', 'green')
+                join_code = receive(connection)
+                if join_code:
+                    join_code = int.from_bytes(join_code,'big')
+                    print("got join code", join_code)
+                    sockets_list[connection] = []
+                    initial_response = json.dumps(format_response(html=html_page, message_list=[]).replace('JOIN_CODE', str(join_code)))
+                    initial_response = len(initial_response).to_bytes(4,'big') + initial_response.encode()
+                    connection.sendall(initial_response)
+                    color_print(f'New connection from {sockets_list[connection]} (socket {connection.fileno()})', 'green')
             else:
                 try:
                     data = b""
                     data = receive(sock)
                     if data:
-                        print(data)
                         demarshalled = json.loads(data)
+                        print("got data from existing connection:",demarshalled)
                         if type(demarshalled) != dict:
                             raise ValueError
                         if 'message' not in demarshalled or 'user' not in demarshalled:
                             raise KeyError
                         sockets_list[sock].append((demarshalled['user'],demarshalled['message']))
-                        response = json.dumps(format_response(html=html_page, message_list=sockets_list[sock][-10:]))
+                        # response = json.dumps(format_response(html=html_page, message_list=sockets_list[sock][-10:]))
+                        response = json.dumps(format_response(html=html_page, message_list=sockets_list[sock]).replace('JOIN_CODE', str(join_code)))
                         response = len(response).to_bytes(4, 'big') + response.encode()
+                        print("sending resp: ", response)
                         sock.sendall(response)
                         
                 except ConnectionResetError:

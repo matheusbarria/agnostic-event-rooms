@@ -3,6 +3,8 @@ import logging
 from room import Room
 import json
 import threading, time
+import signal
+from ColorPrint import color_print
 
 
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -70,10 +72,10 @@ class MiddlemanServer:
             return b"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"
         
     def _handle_post(self,path, request, sock):
+        body = request.split('\r\n\r\n')[1]
+        params = body.split('&')
+        data = {k: v for k, v in (param.split('=') for param in params)}
         if path == '/': # client should be requesting an new application server room
-            body = request.split('\r\n\r\n')[1]
-            params = body.split('&')
-            data = {k: v for k, v in (param.split('=') for param in params)}
             server_number = data.get('server_number')
             if server_number:
                 try:
@@ -89,6 +91,16 @@ class MiddlemanServer:
                 return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
             else: 
                 return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
+        elif len(path)>1:
+            print(data)
+            try:
+                room_num = int(path[1:])
+                self.rooms[room_num].get_response_from_parent(data.get('message'))
+                response_content = f'<html><body><h1>Chat Room</h1></body></html>'
+                return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
+                # return room_message
+            except Exception as ex:
+                print("room number invalid", ex)
 
     def accept_connections(self):
         # create thread to accept registration requests
@@ -99,11 +111,13 @@ class MiddlemanServer:
             try:
                 self.server_socket.listen(2) # play with this val
                 sock, client_address = self.server_socket.accept()
+                color_print(f"accepted connection from {client_address}", 'green')
                 try:
                     data = sock.recv(1024)
                 except Exception as ex:
                     print(ex)
                 resp = self.handle_http_request(data, sock)
+                print("middleman sending to",sock)
                 if resp:
                     sock.sendall(resp)
             except Exception as ex:
@@ -147,10 +161,15 @@ class MiddlemanServer:
 if __name__ == '__main__':
 
     middleman_server = MiddlemanServer()
+    
+    def handle_interrupt(signal_number, frame):
+        print("\nCtrl+C detected. Cleaning up and exiting!")
+        middleman_server.rooms = None
+        middleman_server.server_socket.close()
+        exit()
 
-    # # Register available application servers
-    # middleman_server.register_application_server('trivia', ('127.0.0.1', 6000))
-    # middleman_server.register_application_server('battleship', ('127.0.0.1', 6001))
+    # Register the handler for SIGINT (Ctrl+C)
+    signal.signal(signal.SIGINT, handle_interrupt)
 
     # Start accepting connections from clients
     middleman_server.accept_connections()
