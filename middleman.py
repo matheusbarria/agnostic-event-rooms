@@ -1,6 +1,6 @@
 import socket
 import logging
-from room import Room
+from room_process import Room
 import json
 import threading, time
 import signal
@@ -18,11 +18,11 @@ class MiddlemanServer:
     def __init__(self, host='127.0.0.1', port=5000, max_threads=10):
         self.host = host
         self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        # self.server_socket.bind((socket.gethostname(), port))
-        # self.server_socket.listen()
-        self.location = self.server_socket.getsockname()
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind((self.host, self.port))
+        # self.socket.bind((socket.gethostname(), port))
+        # self.socket.listen()
+        self.location = self.socket.getsockname()
         # self.executor = ThreadPoolExecutor(max_workers=max_threads)
         logging.info(f"Middleman server started on {self.host}:{self.port}")
         print(f'Listening on port {self.location}')
@@ -64,7 +64,7 @@ class MiddlemanServer:
                 <input type="text" id="server_number" name="server_number" required> <input type="submit" value="Submit">
             </form>
             </body>
-            </html> '''
+            </html>'''
             application_servers_list = ''.join(f'<li>{server}</li>' for server in self.application_servers_enum)
             html_content = html_content.format(application_servers=application_servers_list)
             return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + html_content.encode()
@@ -86,9 +86,10 @@ class MiddlemanServer:
                 if not self.is_natural_number(server_number) or server_number>=len(self.application_servers):
                     print('invalid server number, room could not be created')
                     return b"HTTP/1.1 415 Unsupported Media\r\nContent-Type: text/html\r\n\r\n<html><body><h1>415 Unsupported Media</h1>Please enter a valid application number</body></html>"
-                self.create_room(sock, server_number)
-                response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
-                return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
+                new_port = self.create_room(sock, server_number)
+                # response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
+                # return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
+                return b"HTTP/1.1 302 Found\r\nLocation: 127.0.0.1:" + bytes(str(new_port),"utf-8") + b"\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 0"
             else: 
                 return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
         elif len(path)>1:
@@ -109,16 +110,18 @@ class MiddlemanServer:
         name_thread.start()
         while True:
             try:
-                self.server_socket.listen(2) # play with this val
-                sock, client_address = self.server_socket.accept()
+                self.socket.listen(2) # play with this val
+                sock, client_address = self.socket.accept()
                 color_print(f"accepted connection from {client_address}", 'green')
                 try:
                     data = sock.recv(1024)
                 except Exception as ex:
                     print(ex)
+                print(data)
                 resp = self.handle_http_request(data, sock)
                 print("middleman sending to",sock)
                 if resp:
+                    print(resp)
                     sock.sendall(resp)
             except Exception as ex:
                 print(ex)
@@ -142,11 +145,13 @@ class MiddlemanServer:
         app_server_location = self.application_servers.get(self.application_servers_enum[server_number])
         if app_server_location:
             # Start new room process
-            room = Room(self.join_code, client_socket, app_server_location)
+            port = self.port+len(self.rooms)+1
+            room = Room(self.join_code, port, app_server_location)
             self.rooms[self.join_code] = room
             room.start()
             logging.info(f"Room {self.join_code} created for service {self.application_servers_enum[server_number]}.")
             self.join_code+=1
+            return port
         else:
             print('no app server location found; room could not be created')
             pass
@@ -165,7 +170,7 @@ if __name__ == '__main__':
     def handle_interrupt(signal_number, frame):
         print("\nCtrl+C detected. Cleaning up and exiting!")
         middleman_server.rooms = None
-        middleman_server.server_socket.close()
+        middleman_server.socket.close()
         exit()
 
     # Register the handler for SIGINT (Ctrl+C)
