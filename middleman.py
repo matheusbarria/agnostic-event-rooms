@@ -89,7 +89,10 @@ class MiddlemanServer:
                 new_port = self.create_room(sock, server_number)
                 # response_content = f'<html><body><h1>Received Server Number: {server_number}</h1></body></html>'
                 # return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + response_content.encode()
-                return b"HTTP/1.1 302 Found\r\nLocation: 127.0.0.1:" + bytes(str(new_port),"utf-8") + b"\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 0"
+                # return b"HTTP/1.1 302 Found\r\nLocation: 127.0.0.1:" + bytes(str(new_port),"utf-8") + b"\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 0"
+                return ("""\
+HTTP/1.1 302 Found
+Location: http://127.0.0.1:"""+str(new_port)).encode('utf-8')
             else: 
                 return b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<html><body><h1>Bad Request</h1></body></html>"
         elif len(path)>1:
@@ -130,7 +133,7 @@ class MiddlemanServer:
     def register_application_server(self):
         # UDP
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('127.0.0.1', 5001))
+        sock.bind(('127.0.0.1', 4999))
         while 1:
             data = sock.recv(1024)
             if data:
