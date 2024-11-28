@@ -2,9 +2,10 @@ import socket
 from threading import Thread
 import json
 from room import Room
+import logging
 
 def start_room(app_server_addr,room_number):
-    room = Room('127.0.0.1',5000+room_number+1,app_server_addr,room_number)
+    room = Room('127.0.0.1',5000+room_number,app_server_addr,room_number)
     thread = Thread(target=room.start, daemon=True)
     thread.start()
     return thread
@@ -22,7 +23,7 @@ def register_application_server(application_servers, application_servers_enum):
                     application_servers[data['service_name']] = (data['host'],data['port'])
                     application_servers_enum.append(data['service_name'])
 
-def handle_client(client_socket, application_servers_enum, application_servers):
+def handle_client(client_socket, application_servers_enum, application_servers, num_rooms):
     new_thread = None
     # Receive the client's request
     request = client_socket.recv(1024).decode('utf-8')
@@ -64,10 +65,10 @@ HTTP/1.1 200 OK
         try:
             app_num = int(headers[-1].split('=')[-1]) - 1
             app_addr = application_servers[application_servers_enum[app_num]]
-            new_thread = start_room(app_addr,app_num)
+            new_thread = start_room(app_addr,num_rooms+1)
             response = """\
 HTTP/1.1 302 Found
-Location: http://127.0.0.1:500""" + str(app_num+1) + "\n"
+Location: http://127.0.0.1:500""" + str(num_rooms+1) + "\n"
             print(f"sending\n{response}")
             client_socket.send(response.encode('utf-8'))
         except Exception as ex:
@@ -125,7 +126,7 @@ def start_server():
             try:
                 client_socket, client_address = server_socket.accept()
                 print(f"Connection from {client_address}")
-                ret = handle_client(client_socket, application_servers_enum, application_servers)
+                ret = handle_client(client_socket, application_servers_enum, application_servers, thread_count)
                 if ret:
                     rooms[thread_count] = ret
                     thread_count+=1
