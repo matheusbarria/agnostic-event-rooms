@@ -42,14 +42,15 @@ HTTP/1.1 200 OK
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form for 5000</title>
 </head>
-<body>
+<body style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-color: #f4f4f4;">
     <h1>Event Rooms!</h1>
     <br/>
     <h3>Select an Application to Create a Room:</h3>
-    <ol style="list-style-position: inside; text-align: center;"> {application_servers} </ol>
+    <h3>Please enter a valid application room number</h3>
+    <ol style="list-style-position: inside;"> {application_servers} </ol>
     <br/>
     <form method="POST" action="/">
-        <label for="appNum">Enter something:</label>
+        <label for="appNum">Select an Application:</label>
         <input type="text" id="appNum" name="appNum" required>
         <input type="submit" value="Submit">
     </form>
@@ -83,15 +84,15 @@ HTTP/1.1 200 OK
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form for 5000</title>
 </head>
-<body>
+<body style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-color: #f4f4f4;">
     <h1>Event Rooms!</h1>
     <br/>
     <h3>Select an Application to Create a Room:</h3>
     <h3>Please enter a valid application room number</h3>
-    <ol style="list-style-position: inside; text-align: center;"> {application_servers} </ol>
+    <ol style="list-style-position: inside;"> {application_servers} </ol>
     <br/>
     <form method="POST" action="/">
-        <label for="appNum">Enter something:</label>
+        <label for="appNum">Select an Application:</label>
         <input type="text" id="appNum" name="appNum" required>
         <input type="submit" value="Submit">
     </form>

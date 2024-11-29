@@ -123,7 +123,12 @@ HTTP/1.1 200 OK
                 params = body.split('&')
                 data = {k: v for k, v in (param.split('=') for param in params)}
                 message = data.get('message')
-                self.send_to_app({'client':'username', 'message':message, 'room':self.join_code})
+                client = data.get('client')
+                self.send_to_app({'client':client, 'message':message, 'room':self.join_code})
+                if self.app_socket:
+                    data = self.receive_message(self.app_socket)
+                    if data:
+                        self.latest_page = data
                 client_socket.send(self.latest_page)
                 client_socket.close()
             else:
