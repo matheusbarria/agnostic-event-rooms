@@ -1,7 +1,6 @@
 import socket, select
 import json
 from ColorPrint import color_print
-# from chat_html import html_page
 
 MIDDLEMAN_ADDRESS = ('127.0.0.1',4999)
 APPLICATION_NAME = 'chat'
