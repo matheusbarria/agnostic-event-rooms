@@ -5,7 +5,7 @@ from room import Room
 import logging
 
 def start_room(app_server_addr,room_number):
-    room = Room('127.0.0.1',5000+room_number,app_server_addr,room_number)
+    room = Room('127.0.0.1',5050+room_number,app_server_addr,room_number)
     thread = Thread(target=room.start, daemon=True)
     thread.start()
     return thread
@@ -27,8 +27,22 @@ def handle_client(client_socket, application_servers_enum, application_servers, 
     new_thread = None
     # Receive the client's request
     request = client_socket.recv(1024).decode('utf-8')
+    
+    if not request or not request.strip():
+        client_socket.close()
+        return None
+        
     headers = request.split('\r\n')
-    method, path, _ = headers[0].split(' ')
+    if not headers or not headers[0]:
+        client_socket.close()
+        return None
+        
+    request_parts = headers[0].split(' ')
+    if len(request_parts) < 3:
+        client_socket.close()
+        return None
+        
+    method, path, _ = request_parts
 
     # If the request is a GET request to "/"
     if method == "GET" and path == "/":
@@ -69,7 +83,7 @@ HTTP/1.1 200 OK
             new_thread = start_room(app_addr,num_rooms+1)
             response = """\
 HTTP/1.1 302 Found
-Location: http://127.0.0.1:500""" + str(num_rooms+1) + "\n"
+Location: http://127.0.0.1:505""" + str(num_rooms+1) + "\n"
             print(f"sending\n{response}")
             client_socket.send(response.encode('utf-8'))
         except Exception as ex:
@@ -118,10 +132,10 @@ def start_server():
 
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(('127.0.0.1', 5000))
+        server_socket.bind(('127.0.0.1', 5050))
         server_socket.listen(5)
         server_socket.settimeout(1.0)
-        print("Server listening on 127.0.0.1:5000...")
+        print("Server listening on 127.0.0.1:5050...")
         
         while True:
             try:

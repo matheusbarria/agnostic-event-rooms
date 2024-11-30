@@ -33,7 +33,6 @@ BACKGROUND_COLORS = {
     '': '0;'
 }
 
-@staticmethod
 def color_print(text, color="", background="", end='\n'):
     """
     Print text in the specified color.
