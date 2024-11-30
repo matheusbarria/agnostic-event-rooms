@@ -60,7 +60,6 @@ HTTP/1.1 200 OK
     <h1>Event Rooms!</h1>
     <br/>
     <h3>Select an Application to Create a Room:</h3>
-    <h3>Please enter a valid application room number</h3>
     <ol style="list-style-position: inside;"> {application_servers} </ol>
     <br/>
     <form method="POST" action="/">

@@ -35,7 +35,6 @@ def _receive_all(sock, n):
     return resp
 
 def check_win(board):
-    print(board)
     for icol in range(len(board)-4):
         for irow in range(len(board[0])-4):
             if (board[icol][irow]!=-1) and ((
@@ -228,7 +227,6 @@ while True:
                                     if demarshalled['client'] not in room_list[room_id]:
                                         room_list[room_id][demarshalled['client']] = []
                                     room_list[room_id][demarshalled['client']].append((42-7*i)-(6-col)-1)
-                                    print(room_list[room_id])
                                     response = format_response(html=None, moves=room_list[room_id]).replace('JOIN_CODE', str(join_code))
                                 break
 
