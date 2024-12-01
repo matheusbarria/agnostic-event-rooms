@@ -157,4 +157,4 @@ def start_server(port):
         print("Socket closed.")
 
 if __name__ == "__main__":
-    start_server(5000)
+    start_server(5050)
