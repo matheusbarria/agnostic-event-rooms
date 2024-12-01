@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import statistics
 import matplotlib.pyplot as plt
 from collections import defaultdict
-concurrent_rooms = 7
+concurrent_rooms = 128
 class MatchmakerTester:
     def __init__(self, host='127.0.0.1', matchmaker_port=5050):
         self.host = host
