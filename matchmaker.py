@@ -4,8 +4,10 @@ import json
 from room import Room
 import logging
 
-def start_room(app_server_addr,room_number):
-    room = Room('127.0.0.1',5050+room_number,app_server_addr,room_number)
+def start_room(app_server_addr,room_number,base_port):
+    print('in start_rooom',base_port+room_number)
+    room = Room('127.0.0.1',base_port+room_number,app_server_addr,room_number)
+    print(room)
     thread = Thread(target=room.start, daemon=True)
     thread.start()
     return thread
@@ -23,7 +25,7 @@ def register_application_server(application_servers, application_servers_enum):
                     application_servers[data['service_name']] = (data['host'],data['port'])
                     application_servers_enum.append(data['service_name'])
 
-def handle_client(client_socket, application_servers_enum, application_servers, num_rooms):
+def handle_client(client_socket, application_servers_enum, application_servers, num_rooms, port):
     new_thread = None
     # Receive the client's request
     request = client_socket.recv(1024).decode('utf-8')
@@ -79,10 +81,10 @@ HTTP/1.1 200 OK
         try:
             app_num = int(headers[-1].split('=')[-1]) - 1
             app_addr = application_servers[application_servers_enum[app_num]]
-            new_thread = start_room(app_addr,num_rooms+1)
+            new_thread = start_room(app_addr,num_rooms+1,port)
             response = """\
 HTTP/1.1 302 Found
-Location: http://127.0.0.1:505""" + str(num_rooms+1) + "\n"
+Location: http://127.0.0.1:""" + str(port+num_rooms+1) + "\n"
             print(f"sending\n{response}")
             client_socket.send(response.encode('utf-8'))
         except Exception as ex:
@@ -119,7 +121,7 @@ HTTP/1.1 200 OK
 
     return new_thread
 
-def start_server():
+def start_server(port):
     thread_count = 0
     application_servers_enum = []
     application_servers = {}  # Format: {'service_name': ('ip', port)}
@@ -131,16 +133,16 @@ def start_server():
 
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(('127.0.0.1', 5050))
+        server_socket.bind(('127.0.0.1', port))
         server_socket.listen(5)
         server_socket.settimeout(1.0)
-        print("Server listening on 127.0.0.1:5050...")
+        print("Server listening on 127.0.0.1:"+str(port))
         
         while True:
             try:
                 client_socket, client_address = server_socket.accept()
                 print(f"Connection from {client_address}")
-                ret = handle_client(client_socket, application_servers_enum, application_servers, thread_count)
+                ret = handle_client(client_socket, application_servers_enum, application_servers, thread_count,port=port)
                 if ret:
                     rooms[thread_count] = ret
                     thread_count+=1
@@ -155,4 +157,4 @@ def start_server():
         print("Socket closed.")
 
 if __name__ == "__main__":
-    start_server()
+    start_server(5000)
